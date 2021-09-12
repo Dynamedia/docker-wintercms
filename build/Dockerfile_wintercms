@@ -1,0 +1,79 @@
+# This will build from the v1.1 branch of Winter CMS
+
+FROM dynamedia/docker-nginx-fpm:v1.20.0_8.0.x as cms_base
+
+LABEL maintainer="Rob Ballantyne <rob@dynamedia.uk>"
+
+### Install supplementary packages required by Winter CMS ###
+
+RUN apt update && \
+    apt-get install --no-install-recommends --no-install-suggests -y \
+        ca-certificates    \
+        vim                \
+        nano               \
+        curl               \
+        zlib1g             \
+        libssl1.1          \
+        libpcre3           \
+        libxml2            \
+        libyajl2           \
+        sendmail-bin       \
+        cron               \
+        supervisor && \
+    curl -sL https://deb.nodesource.com/setup_12.x | bash - && \
+    apt update && \
+    apt-get install --no-install-recommends --no-install-suggests -y \
+        nodejs && \
+    apt clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    ldconfig && \
+    npm install yarn -g && \
+    mv /usr/local/bin/entrypoint.sh /usr/local/bin/nginx-fpm-entrypoint.sh && \
+    cd /var/www/ && \
+    rm -rf app
+
+FROM cms_base
+
+ARG OCTOBER_LICENSE
+
+RUN composer --no-cache create-project winter/winter app v1.1* && \
+    composer clear-cache && \
+    cd app && \
+    php artisan project:set ${OCTOBER_LICENSE} && \
+    php artisan winter:build
+
+# Be careful here. You might clobber files. Know your data directory when building
+COPY ./data/app/storage /var/www/app/storage
+COPY ./data/app/plugins /var/www/app/plugins
+COPY ./data/app/themes /var/www/app/themes
+
+# Sanitise the .env. **Do not ship this container with an app key**, it has to be generated on first run
+
+RUN sed -i "s#DB_CONNECTION=.*#DB_CONNECTION=mysql#g" /var/www/app/.env && \
+    sed -i "s#APP_KEY=.*#APP_KEY=#g" /var/www/app/.env && \
+    sed -i "s#DB_HOST=.*#DB_HOST=database#g" /var/www/app/.env && \
+    sed -i "s#DB_PORT=.*#DB_PORT=3306#g" /var/www/app/.env && \
+    sed -i "s#DB_DATABASE=.*#DB_DATABASE=winter#g" /var/www/app/.env && \
+    sed -i "s#DB_USERNAME=.*#DB_USERNAME=root#g" /var/www/app/.env && \
+    sed -i "s#DB_PASSWORD=.*#DB_PASSWORD=#g" /var/www/app/.env && \
+    sed -i "s#LINK_POLICY=.*#LINK_POLICY=force#g" /var/www/app/.env && \
+    cp /var/www/app/.env /var/www/app/.env-original && \
+    tar -C /var/www/ -zcvf /var/www/app.tar.gz app
+
+# These are the files and directories we mount via docker-compose.yml - When we build, we copy into the image
+COPY ./.config/php/default/www.conf /usr/local/etc/php-fpm.d/www.conf
+COPY ./.config/php/default/php.ini /usr/local/etc/php/php.ini
+
+COPY ./.config/nginx/default/nginx.conf /etc/nginx/nginx.conf
+COPY ./.config/nginx/default/sites-enabled /etc/nginx/sites-enabled
+
+COPY ./.config/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY ./.config/user.crontab /user.crontab
+
+COPY ./build/entrypoint-wintercms.sh /usr/local/bin/entrypoint.sh
+
+WORKDIR /var/www/app/
+
+ENTRYPOINT ["entrypoint.sh"]
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
