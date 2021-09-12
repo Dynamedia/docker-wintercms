@@ -34,13 +34,12 @@ RUN apt update && \
 
 FROM cms_base
 
-ARG OCTOBER_LICENSE
+ARG COMPOSER_AUTH
 
-RUN composer --no-cache create-project winter/winter app v1.1* && \
+RUN composer --no-cache create-project wintercms/winter app v1.1.* && \
     composer clear-cache && \
     cd app && \
-    php artisan project:set ${OCTOBER_LICENSE} && \
-    php artisan winter:build
+    php artisan winter:env
 
 # Be careful here. You might clobber files. Know your data directory when building
 COPY ./data/app/storage /var/www/app/storage

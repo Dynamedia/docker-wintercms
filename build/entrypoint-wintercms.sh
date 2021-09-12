@@ -60,7 +60,7 @@ install_plugins()
             do
                sleep 5
                echo "going to install $plugin"
-               php artisan -vvv plugin:install $plugin
+                   composer require $plugin
             done
         log_entry "Plugins Installed: " ${PLUGIN_ARRAY[@]}
         log_entry "Plugins last installed: " "$(get_date_time)"
@@ -74,7 +74,7 @@ install_themes()
         IFS=', ' read -r -a THEME_ARRAY <<< "$CMS_THEMES"
         for theme in ${THEME_ARRAY[@]}
             do
-               php artisan theme:install $theme
+               composer require $theme
             done
         log_entry "Themes Installed: " ${THEME_ARRAY[@]}
         log_entry "Themes last installed: " "$(get_date_time)"
@@ -201,7 +201,7 @@ if config_wants_database ; then
     echo "Attempting to connect to database..."
 
     while [ $DB_ATTEMPT -le $DB_MAX_TRIES ] ; do
-      php artisan winter:migrate
+      php artisan winter:up
       if [ $? -eq 0 ] ; then
         DB_UP=1
         echo "Database is up"
@@ -242,7 +242,7 @@ if config_wants_database ; then
       done
 
       # Re-run migrations after git clones
-      php artisan winter:migrate
+      php artisan winter:up
       else
         echo "Could not connect to the database. Check your configuration"
     fi

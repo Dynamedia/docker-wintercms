@@ -31,14 +31,14 @@ services:
     # Try https://github.com/docker-reverse-proxy (nginx, docker-gen, letsencrypt companion)
     # You will need to remove the ports declaration, expose port 80 & do docker network create reverse-proxy
     ports:
-      - 800:80
+      - 900:80
     #expose:
     #  - 80
 
-  database:
+  wintercms_database:
     env_file:
       - .env
-    image: dynamedia-mysql:8
+    image: dynamedia-winter-mysql:8
     build:
       context: .
       dockerfile: build/Dockerfile_mysql
